@@ -1,0 +1,25 @@
+{
+  "name": "socket",
+  "version": "1.0.0",
+  "description": "Socket.IO service for DataLexIA-PrivacyIA",
+  "type": "module",
+  "main": "dist/server.js",
+  "imports": {
+    "#src/*": "./dist/*.js"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.8",
+    "socket.io": "^4.8.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "socket.io-client": "^4.8.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
