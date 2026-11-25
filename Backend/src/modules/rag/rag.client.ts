@@ -5,6 +5,9 @@ import { env } from "#src/config/env.js";
 // La revisión de cumplimiento puede tardar varios minutos (modelo local).
 const TIMEOUT_MS = 30 * 60 * 1000;
 
+/** Cabecera con la clave de FastAPI; la clave vive solo en el Backend y nunca llega al navegador. */
+const apiKeyHeader = (): Record<string, string> => (env.fastapiApiKey ? { "x-api-key": env.fastapiApiKey } : {});
+
 /**
  * Reenvía la petición a FastAPI y devuelve su respuesta tal cual (status, content-type y cuerpo).
  * - JSON: se vuelve a serializar el body ya parseado por express.json().
@@ -35,6 +38,8 @@ export async function forward(req: Request, res: Response, path: string): Promis
       init.body = JSON.stringify(req.body ?? {});
     }
   }
+
+  init.headers = { ...(init.headers as Record<string, string> | undefined), ...apiKeyHeader() };
 
   let upstream: globalThis.Response;
   try {
@@ -68,7 +73,7 @@ export async function ragCall<T = any>(method: "GET" | "POST" | "DELETE", path: 
     const isForm = payload instanceof FormData;
     upstream = await fetch(env.fastapiUrl + path, {
       method,
-      headers: payload && !isForm ? { "content-type": "application/json" } : undefined,
+      headers: { ...(payload && !isForm ? { "content-type": "application/json" } : {}), ...apiKeyHeader() },
       body: payload ? (isForm ? payload : JSON.stringify(payload)) : undefined,
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
