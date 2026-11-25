@@ -15,4 +15,6 @@ export const env = {
   jwtSecret: required("JWT_SECRET"),
   jwtExpiresInSeconds: Number(process.env.JWT_EXPIRES_SECONDS ?? 28800),
   fastapiUrl: (process.env.FASTAPI_URL ?? "http://127.0.0.1:8000").replace(/\/+$/, ""),
+  // Debe coincidir con RAG_API_KEY de FastAPI. Vacía = FastAPI sin protección (solo local).
+  fastapiApiKey: process.env.FASTAPI_API_KEY ?? "",
 };
