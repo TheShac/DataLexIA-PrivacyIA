@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import { useAuth } from '../auth/context'
 import FeedbackWidget from '../components/FeedbackWidget'
 import ReviewModal from '../components/ReviewModal'
+import DocumentPreview from '../components/DocumentPreview'
 import { ErrorBox, Loading, SeverityBadge, StatusBadge, Card } from '../components/ui'
 import { FINDING_STATUS, SEVERITY, fmtDate } from '../lib/format'
 import { useFetch } from '../lib/useFetch'
@@ -145,6 +146,27 @@ export default function Analysis() {
     document.getElementById(`finding-${fid}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }
 
+  // Lista de fragmentos marcados: se muestra cuando no hay archivo para la vista previa.
+  const marks = (
+    <Card title="Partes marcadas" aside={<span className="small">Haz clic para ver el hallazgo</span>}>
+      <div className="btn-row" style={{ marginBottom: 12 }}>
+        {Object.entries(SEVERITY).map(([k, v]) => (
+          <span key={k} className="badge" style={{ background: v.bg, color: v.fg }}>{findings.filter((f) => f.severity === k).length} · {v.label}</span>
+        ))}
+      </div>
+      <div className="stack" style={{ gap: 8 }}>
+        {findings.length === 0 && <div className="empty">No se encontraron incumplimientos.</div>}
+        {findings.map((f, i) => (
+          <button key={f.id} className={`mark ${sel === f.id ? "sel" : ""} ${f.status === "rechazado" ? "rejected" : ""}`} style={{ background: SEVERITY[f.severity].bg }} onClick={() => choose(f.id)}>
+            <div className="small muted">{f.location}{f.page ? ` · pág. ${f.page}` : ''}</div>
+            {f.quote || f.fragment || 'Aplica a todo el documento'}
+            <sup>{i + 1}</sup>
+          </button>
+        ))}
+      </div>
+    </Card>
+  )
+
   return (
     <>
       <div className="analysis-head">
@@ -157,7 +179,7 @@ export default function Analysis() {
         </div>
       </div>
 
-      <main className="page">
+      <main className="page wide">
         {actionError && <ErrorBox error={actionError} />}
         {inProgress(data) && (
           <div className="alert info"><span className="spinner" /> {a.status === 'pendiente' ? 'En cola, esperando su turno…' : 'Analizando el documento. Puede tardar varios minutos; esta página se actualiza sola.'}</div>
@@ -166,24 +188,8 @@ export default function Analysis() {
         {data.mitigationsPending && <div className="alert info"><span className="spinner" /> Generando medidas de mitigación…</div>}
 
         {a.status === 'completado' && (
-          <div className="layout-2 even" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.2fr) 320px' }}>
-            <Card title="Partes marcadas" aside={<span className="small">Haz clic para ver el hallazgo</span>}>
-              <div className="btn-row" style={{ marginBottom: 12 }}>
-                {Object.entries(SEVERITY).map(([k, v]) => (
-                  <span key={k} className="badge" style={{ background: v.bg, color: v.fg }}>{findings.filter((f) => f.severity === k).length} · {v.label}</span>
-                ))}
-              </div>
-              <div className="stack" style={{ gap: 8 }}>
-                {findings.length === 0 && <div className="empty">No se encontraron incumplimientos.</div>}
-                {findings.map((f, i) => (
-                  <button key={f.id} className={`mark ${sel === f.id ? "sel" : ""} ${f.status === "rechazado" ? "rejected" : ""}`} style={{ background: SEVERITY[f.severity].bg }} onClick={() => choose(f.id)}>
-                    <div className="small muted">{f.location}{f.page ? ` · pág. ${f.page}` : ''}</div>
-                    {f.quote || f.fragment || 'Aplica a todo el documento'}
-                    <sup>{i + 1}</sup>
-                  </button>
-                ))}
-              </div>
-            </Card>
+          <div className="analysis-grid">
+            <DocumentPreview key={a.id} analysisId={a.id} filename={doc.filename} findings={findings} selected={sel} onSelect={choose} fallback={marks} />
 
             <div className="stack">
               {findings.map((f, i) => (
@@ -191,7 +197,7 @@ export default function Analysis() {
               ))}
             </div>
 
-            <div className="stack">
+            <div className="stack analysis-side">
               <Card title="Datos extraídos">
                 <div className="kv"><span>Resultado</span><b>{a.overall === 'cumple' ? 'Cumple' : 'No cumple'}</b></div>
                 <div className="kv"><span>Estado</span><StatusBadge status={a.status} /></div>

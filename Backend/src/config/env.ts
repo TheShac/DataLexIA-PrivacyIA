@@ -17,4 +17,6 @@ export const env = {
   fastapiUrl: (process.env.FASTAPI_URL ?? "http://127.0.0.1:8000").replace(/\/+$/, ""),
   // Debe coincidir con RAG_API_KEY de FastAPI. Vacía = FastAPI sin protección (solo local).
   fastapiApiKey: process.env.FASTAPI_API_KEY ?? "",
+  // Dónde se guardan los archivos analizados (relativa a la carpeta desde la que se arranca).
+  storageDir: process.env.STORAGE_DIR || "storage",
 };

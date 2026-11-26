@@ -48,26 +48,33 @@ export const setUnauthorizedHandler = (fn) => {
   onUnauthorized = fn
 }
 
-/**
- * Llamada al backend. `json` envía JSON, `form` envía FormData, `blob` devuelve un Blob.
- * Un 401 fuera del login cierra la sesión.
- */
-export async function api(path, { method = 'GET', json, form, blob = false, signal } = {}) {
+async function request(path, { method, json, form, signal }) {
   const headers = {}
   const token = tokenStore.get()
   if (token) headers.Authorization = `Bearer ${token}`
   if (json !== undefined) headers['Content-Type'] = 'application/json'
 
-  let res
   try {
-    res = await fetch(`/api${path}`, { method, headers, body: form ?? (json !== undefined ? JSON.stringify(json) : undefined), signal })
+    return await fetch(`/api${path}`, { method, headers, body: form ?? (json !== undefined ? JSON.stringify(json) : undefined), signal })
   } catch (err) {
     if (err.name === 'AbortError') throw err
     throw new ApiError(0, 'No se pudo conectar con el servidor')
   }
+}
+
+/**
+ * Llamada al backend. `json` envía JSON, `form` envía FormData, `blob` devuelve un Blob.
+ * Un 401 fuera del login cierra la sesión.
+ */
+export async function api(path, { method = 'GET', json, form, blob = false, signal } = {}) {
+  const res = await request(path, { method, json, form, signal })
 
   if (res.status === 204) return null
   if (res.ok && blob) return res.blob()
+  return readBody(path, res)
+}
+
+async function readBody(path, res) {
 
   const text = await res.text()
   let data = text
@@ -82,4 +89,24 @@ export async function api(path, { method = 'GET', json, form, blob = false, sign
     throw new ApiError(res.status, messageFrom(data, `Error ${res.status}`), data)
   }
   return data
+}
+
+/**
+ * POST cuya respuesta llega por partes (NDJSON): llama a `onEvent` con cada objeto apenas se recibe.
+ */
+export async function apiStream(path, { json, onEvent, signal }) {
+  const res = await request(path, { method: 'POST', json, signal })
+  if (!res.ok) return readBody(path, res) // lanza el ApiError correspondiente
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let pending = ''
+  for (;;) {
+    const { value, done } = await reader.read()
+    pending += decoder.decode(value, { stream: !done })
+    const lines = pending.split('\n')
+    pending = done ? '' : lines.pop() // la última puede estar a medias
+    for (const line of lines) if (line.trim()) onEvent(JSON.parse(line))
+    if (done) return
+  }
 }

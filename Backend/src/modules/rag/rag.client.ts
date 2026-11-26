@@ -92,3 +92,36 @@ export async function ragCall<T = any>(method: "GET" | "POST" | "DELETE", path: 
   }
   return { status: upstream.status, ok: upstream.ok, body };
 }
+
+/**
+ * Como ragCall (POST con JSON), pero entrega la respuesta sin leer, para consumirla a medida que llega.
+ * `signal` permite cortar la generación si el cliente se desconecta.
+ */
+export async function ragStream(path: string, payload: Record<string, unknown>, signal: AbortSignal): Promise<globalThis.Response> {
+  try {
+    return await fetch(env.fastapiUrl + path, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...apiKeyHeader() },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
+    });
+  } catch (err) {
+    const timedOut = err instanceof Error && err.name === "TimeoutError";
+    throw Object.assign(new Error(timedOut ? "FastAPI tardó demasiado en responder" : `No se pudo conectar con FastAPI en ${env.fastapiUrl}`), {
+      status: timedOut ? 504 : 502,
+    });
+  }
+}
+
+/** Convierte un cuerpo NDJSON (un objeto JSON por línea) en objetos, a medida que llegan. */
+export async function* readNdjson(body: ReadableStream<Uint8Array>): AsyncGenerator<any> {
+  const decoder = new TextDecoder();
+  let pending = "";
+  for await (const chunk of body as unknown as AsyncIterable<Uint8Array>) {
+    pending += decoder.decode(chunk, { stream: true });
+    const lines = pending.split("\n");
+    pending = lines.pop()!; // la última puede estar a medias
+    for (const line of lines) if (line.trim()) yield JSON.parse(line);
+  }
+  if (pending.trim()) yield JSON.parse(pending);
+}

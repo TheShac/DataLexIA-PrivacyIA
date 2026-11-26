@@ -17,6 +17,7 @@ import {
   recomputePriority,
 } from "#src/modules/analyses/analyses.service.js";
 import { buildDpia } from "#src/modules/analyses/dpia.service.js";
+import { findOriginal, saveOriginal } from "#src/modules/analyses/storage.service.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -67,6 +68,9 @@ router.post("/", requirePermission("analyses.run"), uploadFile, async (req, res,
       });
       [doc] = await db.select().from(documents).where(eq(documents.id, ins.insertId));
     }
+
+    // Se guarda el original para la vista previa; si falla, el análisis sigue igual.
+    await saveOriginal(sha256, file.buffer).catch((err) => console.error("[analyses] no se pudo guardar el original:", err));
 
     const config = await captureConfig(f.data.k, file.originalname);
     const [ins] = await db.insert(analyses).values({ documentId: doc.id, requestedBy: req.user!.id, config });
@@ -126,6 +130,28 @@ router.get("/:id", requirePermission("analyses.read"), async (req, res, next) =>
       mitigationsPending: hasPendingMitigations(id),
       findings: await loadFindings(id),
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* Archivo original analizado, para la vista previa. */
+router.get("/:id/file", requirePermission("analyses.read"), async (req, res, next) => {
+  try {
+    const id = parseId(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+    const row = await loadAnalysis(id);
+    if (!row) return res.status(404).json({ error: "Análisis no encontrado" });
+    const file = await findOriginal(row.document.sha256);
+    if (!file) {
+      return res.status(404).json({ error: "El archivo original no está guardado. Vuelve a subirlo para ver la vista previa." });
+    }
+    await audit(req, { action: "analysis.file_view", entityType: "analysis", entityId: id });
+    // Siempre como descarga y sin caché: es un archivo ajeno, el navegador no debe interpretarlo ni retenerlo.
+    res.setHeader("content-type", "application/octet-stream");
+    res.setHeader("content-disposition", `attachment; filename*=UTF-8''${encodeURIComponent(row.document.filename)}`);
+    res.setHeader("cache-control", "private, no-store");
+    res.sendFile(file, { cacheControl: false }, (err) => err && next(err));
   } catch (err) {
     next(err);
   }
