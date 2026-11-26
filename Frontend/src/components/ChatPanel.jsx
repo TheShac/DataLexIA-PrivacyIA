@@ -6,17 +6,29 @@ import FeedbackWidget from './FeedbackWidget'
 const SUGGESTIONS = ['¿Qué plazos de conservación exige la ley?', '¿Cómo debe informarse el ejercicio de derechos?']
 
 /** Chat normativo (CU-10/CU-11). Usa POST /api/chat/ask, que guarda la conversación y devuelve las fuentes. */
-export default function ChatPanel({ onClose }) {
+export default function ChatPanel({ open, onClose }) {
   const { can } = useAuth()
   const [msgs, setMsgs] = useState([])
   const [conversationId, setConversationId] = useState(null)
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const endRef = useRef(null)
+  const inputRef = useRef(null)
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: 'end' })
-  }, [msgs, busy])
+    if (open) endRef.current?.scrollIntoView({ block: 'end' })
+  }, [msgs, busy, open])
+
+  // Al abrir el chat el cursor queda listo en el campo de texto.
+  useEffect(() => {
+    if (open) inputRef.current?.focus()
+  }, [open])
+
+  function reset() {
+    setMsgs([])
+    setConversationId(null)
+    setDraft('')
+  }
 
   async function ask(question) {
     const q = question.trim()
@@ -36,13 +48,16 @@ export default function ChatPanel({ onClose }) {
   }
 
   return (
-    <aside className="chat" aria-label="Chat normativo">
+    <aside id="chat-panel" className="chat" aria-label="Chat normativo" hidden={!open} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
       <header>
         <div>
           <b>Preguntar a la normativa</b>
           <div className="muted small">Responde citando la fuente</div>
         </div>
-        <button className="icon-btn" onClick={onClose} aria-label="Cerrar chat">✕</button>
+        <div className="btn-row" style={{ flexWrap: 'nowrap' }}>
+          {msgs.length > 0 && <button className="btn sm" onClick={reset} disabled={busy}>Nueva</button>}
+          <button className="icon-btn" onClick={onClose} aria-label="Cerrar chat">✕</button>
+        </div>
       </header>
       <div className="chat-body">
         {msgs.length === 0 && (
@@ -79,6 +94,7 @@ export default function ChatPanel({ onClose }) {
       </div>
       <footer>
         <input
+          ref={inputRef}
           className="input"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

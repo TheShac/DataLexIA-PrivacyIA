@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../auth/context'
-import ChatPanel from '../components/ChatPanel'
 import FeedbackWidget from '../components/FeedbackWidget'
 import ReviewModal from '../components/ReviewModal'
 import { ErrorBox, Loading, SeverityBadge, StatusBadge, Card } from '../components/ui'
@@ -117,7 +116,6 @@ export default function Analysis() {
   const { id } = useParams()
   const { can } = useAuth()
   const [selected, setSelected] = useState(null)
-  const [chat, setChat] = useState(false)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState(null)
 
@@ -155,7 +153,6 @@ export default function Analysis() {
           <div className="muted small">Análisis N.º {a.id} · {data.requestedBy} · Contra Ley N° 21.719</div>
         </div>
         <div className="btn-row">
-          {can('chat.use') && <button className="btn" onClick={() => setChat(true)}>Preguntar</button>}
           <Link className="btn primary" to="/">Subir</Link>
         </div>
       </div>
@@ -213,7 +210,6 @@ export default function Analysis() {
           </div>
         )}
       </main>
-      {chat && <ChatPanel onClose={() => setChat(false)} />}
     </>
   )
 }
